@@ -1,0 +1,28 @@
+{
+  "name": "playctl",
+  "version": "0.1.0",
+  "description": "Google Play Console from the terminal: see what is on each track and promote releases with a service account.",
+  "license": "MIT",
+  "author": "Diego Horvatti",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DIEGOHORVATTI/playctl.git"
+  },
+  "keywords": ["google-play", "play-console", "android", "release", "cli"],
+  "type": "module",
+  "bin": {
+    "playctl": "./src/cli.ts"
+  },
+  "files": ["src", "!src/**/*.test.ts"],
+  "engines": {
+    "bun": ">=1.2"
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.0",
+    "typescript": "^5.9.3"
+  }
+}
