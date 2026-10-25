@@ -39,6 +39,7 @@ async function main(argv: string[]) {
     if (!manifest) throw new Error(USAGE)
 
     await play.replaceImages(readManifest(manifest))
+    console.log('Done, the store listing is updated')
     return
   }
 
