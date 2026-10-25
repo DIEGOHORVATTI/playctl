@@ -9,18 +9,22 @@ type Manifest = {
   imageType: string
   languages: Record<string, { dir: string; listing?: Listing }>
   screenshots: string[]
+  clearImageTypes?: string[]
 }
 
 function readManifest(file: string) {
   const manifest = JSON.parse(readFileSync(file, 'utf8')) as Manifest
   const root = dirname(file)
 
-  return Object.entries(manifest.languages).map(([language, { dir, listing }]) => ({
-    language,
-    listing,
-    imageType: manifest.imageType,
-    files: manifest.screenshots.map((name) => join(root, dir, name)),
-  }))
+  return Object.entries(manifest.languages).flatMap(([language, { dir, listing }]) => [
+    {
+      language,
+      listing,
+      imageType: manifest.imageType,
+      files: manifest.screenshots.map((name) => join(root, dir, name)),
+    },
+    ...(manifest.clearImageTypes ?? []).map((imageType) => ({ language, imageType, files: [] })),
+  ])
 }
 
 async function main(argv: string[]) {
