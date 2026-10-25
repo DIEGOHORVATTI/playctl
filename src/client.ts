@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs'
+import { basename } from 'node:path'
+import { statSync, readFileSync } from 'node:fs'
 import { createSign } from 'node:crypto'
 
 const SCOPE = 'https://www.googleapis.com/auth/androidpublisher'
@@ -141,12 +142,27 @@ export async function playClient({ packageName, keyFile }: ClientOptions) {
       }, true),
     replaceImages: (sets: ImageSet[]) =>
       withEdit(async (id) => {
+        const total = sets.reduce((sum, set) => sum + set.files.length, 0)
+        let done = 0
+
         for (const { language, imageType, files } of sets) {
           const path = `/edits/${id}/listings/${language}/${imageType}`
+          console.log(`${language}: removing current ${imageType}`)
           await call(path, 'DELETE')
-          for (const file of files) await upload(path, file)
-          console.log(`${language}: ${files.length} ${imageType}`)
+
+          for (const file of files) {
+            const started = Date.now()
+            const size = (statSync(file).size / 1024 / 1024).toFixed(1)
+            process.stdout.write(
+              `  [${done + 1}/${total}] ${language} ${basename(file)} ${size} MB... `,
+            )
+            await upload(path, file)
+            done++
+            console.log(`${((Date.now() - started) / 1000).toFixed(1)}s`)
+          }
         }
+
+        console.log('Committing edit, Google may take a minute...')
       }, true),
   }
 }
