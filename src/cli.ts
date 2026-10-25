@@ -10,6 +10,7 @@ type Manifest = {
   languages: Record<string, { dir: string; listing?: Listing }>
   screenshots: string[]
   clearImageTypes?: string[]
+  copyImageTypes?: string[]
   featureGraphic?: string
 }
 
@@ -33,6 +34,11 @@ function readManifest(file: string) {
           },
         ]
       : []),
+    ...(manifest.copyImageTypes ?? []).map((imageType) => ({
+      language,
+      imageType,
+      files: manifest.screenshots.map((name) => join(root, dir, name)),
+    })),
     ...(manifest.clearImageTypes ?? []).map((imageType) => ({ language, imageType, files: [] })),
   ])
 }
