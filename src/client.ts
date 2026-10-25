@@ -9,7 +9,8 @@ const SCOPE = [
 const STORAGE_API = 'https://storage.googleapis.com/storage/v1/b'
 const API = 'https://androidpublisher.googleapis.com/androidpublisher/v3/applications'
 const UPLOAD_API = 'https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications'
-const TOKEN_TTL_SECONDS = 600
+const TOKEN_TTL_SECONDS = 3600
+const UPLOAD_ATTEMPTS = 4
 
 type ServiceAccount = {
   client_email: string
@@ -113,13 +114,22 @@ export async function playClient({ packageName, keyFile }: ClientOptions) {
     return (text ? JSON.parse(text) : {}) as T
   }
 
-  const upload = async (path: string, file: string) => {
+  const upload = async (path: string, file: string, attempt = 1): Promise<void> => {
     const response = await fetch(`${UPLOAD_API}/${packageName}${path}?uploadType=media`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'image/png' },
       body: readFileSync(file),
     })
-    if (!response.ok) throw new Error(`Play upload ${response.status}: ${await response.text()}`)
+    if (response.ok) return
+
+    const text = await response.text()
+    if (response.status < 500 || attempt >= UPLOAD_ATTEMPTS) {
+      throw new Error(`Play upload ${response.status}: ${text}`)
+    }
+
+    process.stdout.write(`${response.status}, retrying (${attempt}/${UPLOAD_ATTEMPTS - 1})... `)
+    await Bun.sleep(attempt * 3000)
+    return upload(path, file, attempt + 1)
   }
 
   const withEdit = async <T>(work: (editId: string) => Promise<T>, commit: boolean) => {
