@@ -2,12 +2,12 @@
 import { dirname, join } from 'node:path'
 import { readFileSync } from 'node:fs'
 
-import { playClient } from './client'
+import { type Listing, playClient } from './client'
 import { USAGE, parseInvocation } from './args'
 
 type Manifest = {
   imageType: string
-  languages: Record<string, { dir: string }>
+  languages: Record<string, { dir: string; listing?: Listing }>
   screenshots: string[]
 }
 
@@ -15,8 +15,9 @@ function readManifest(file: string) {
   const manifest = JSON.parse(readFileSync(file, 'utf8')) as Manifest
   const root = dirname(file)
 
-  return Object.entries(manifest.languages).map(([language, { dir }]) => ({
+  return Object.entries(manifest.languages).map(([language, { dir, listing }]) => ({
     language,
+    listing,
     imageType: manifest.imageType,
     files: manifest.screenshots.map((name) => join(root, dir, name)),
   }))

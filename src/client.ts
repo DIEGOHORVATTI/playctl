@@ -26,8 +26,15 @@ export type Track = {
   releases?: Release[]
 }
 
+export type Listing = {
+  title: string
+  shortDescription: string
+  fullDescription: string
+}
+
 export type ImageSet = {
   language: string
+  listing?: Listing
   imageType: string
   files: string[]
 }
@@ -145,7 +152,12 @@ export async function playClient({ packageName, keyFile }: ClientOptions) {
         const total = sets.reduce((sum, set) => sum + set.files.length, 0)
         let done = 0
 
-        for (const { language, imageType, files } of sets) {
+        for (const { language, listing, imageType, files } of sets) {
+          if (listing) {
+            console.log(`${language}: writing store listing "${listing.title}"`)
+            await call(`/edits/${id}/listings/${language}`, 'PUT', { language, ...listing })
+          }
+
           const path = `/edits/${id}/listings/${language}/${imageType}`
           console.log(`${language}: removing current ${imageType}`)
           await call(path, 'DELETE')
