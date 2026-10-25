@@ -2,7 +2,11 @@ import { basename } from 'node:path'
 import { statSync, readFileSync } from 'node:fs'
 import { createSign } from 'node:crypto'
 
-const SCOPE = 'https://www.googleapis.com/auth/androidpublisher'
+const SCOPE = [
+  'https://www.googleapis.com/auth/androidpublisher',
+  'https://www.googleapis.com/auth/devstorage.read_only',
+].join(' ')
+const STORAGE_API = 'https://storage.googleapis.com/storage/v1/b'
 const API = 'https://androidpublisher.googleapis.com/androidpublisher/v3/applications'
 const UPLOAD_API = 'https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications'
 const TOKEN_TTL_SECONDS = 600
@@ -133,7 +137,27 @@ export async function playClient({ packageName, keyFile }: ClientOptions) {
     }
   }
 
+  const storage = async (bucket: string, path: string) => {
+    const response = await fetch(`${STORAGE_API}/${bucket}/o${path}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!response.ok) throw new Error(`Cloud Storage ${response.status}: ${await response.text()}`)
+
+    return response
+  }
+
   return {
+    reportFiles: async (bucket: string, prefix: string) => {
+      const response = await storage(bucket, `?prefix=${encodeURIComponent(prefix)}`)
+      const { items = [] } = (await response.json()) as { items?: { name: string }[] }
+
+      return items.map((item) => item.name)
+    },
+    readReport: async (bucket: string, name: string) => {
+      const response = await storage(bucket, `/${encodeURIComponent(name)}?alt=media`)
+
+      return new TextDecoder('utf-16le').decode(await response.arrayBuffer()).replace(/^\uFEFF/, '')
+    },
     tracks: () =>
       withEdit((id) => call<{ tracks: Track[] }>(`/edits/${id}/tracks`), false).then(
         (result) => result.tracks,

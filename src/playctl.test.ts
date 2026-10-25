@@ -16,6 +16,7 @@ describe('parseInvocation', () => {
       keyFile: '/home/me/.config/playctl/key.json',
       from: 'alpha',
       to: 'production',
+      bucket: '',
     })
   })
 

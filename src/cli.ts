@@ -45,14 +45,33 @@ function readManifest(file: string) {
 
 async function main(argv: string[]) {
   const invocation = parseInvocation(argv)
-  const { command, positional, packageName, keyFile, from, to } = invocation
+  const { command, positional, packageName, keyFile, from, to, bucket } = invocation
 
-  if (!['status', 'promote', 'images'].includes(command ?? '')) {
+  if (!['status', 'promote', 'images', 'stats'].includes(command ?? '')) {
     console.log(USAGE)
     return
   }
 
   const play = await playClient({ packageName, keyFile })
+
+  if (command === 'stats') {
+    if (!bucket) throw new Error(`Missing --bucket.\n\n${USAGE}`)
+
+    const [kind = 'installs'] = positional
+    const files = await play.reportFiles(bucket, `stats/${kind}/`)
+    const ours = files.filter((name) => name.includes(packageName)).sort()
+    if (!ours.length) {
+      console.log(`No ${kind} reports for ${packageName}. Files found:\n${files.join('\n')}`)
+      return
+    }
+
+    const latestMonth = ours.at(-1)!.match(/_(\d{6})_/)?.[1]
+    for (const name of ours.filter((file) => file.includes(`_${latestMonth}_`))) {
+      console.log(`\n== ${name}`)
+      console.log(await play.readReport(bucket, name))
+    }
+    return
+  }
 
   if (command === 'images') {
     const [manifest] = positional
