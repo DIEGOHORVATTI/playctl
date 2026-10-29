@@ -15,8 +15,6 @@ cd playctl && bun install && bun link
 playctl status --package com.example.app
 playctl promote 18 --package com.example.app
 playctl promote 19 --from internal --to production --package com.example.app
-```
-
 playctl upload app-release.aab --track internal --status draft --name 1.0.0 --notes play/whatsnew
 playctl details --email you@example.com --website https://example.com
 playctl datasafety data-safety.csv
