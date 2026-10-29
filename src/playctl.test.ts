@@ -1,7 +1,7 @@
 import { it, expect, describe } from 'bun:test'
 
 import { parseInvocation } from './args'
-import { releaseToPromote } from './client'
+import { contentTypeOf, releaseToPromote } from './client'
 
 const environment = { cwd: '/tmp/nowhere', env: {}, home: '/home/me' }
 
@@ -17,7 +17,19 @@ describe('parseInvocation', () => {
       from: 'alpha',
       to: 'production',
       bucket: '',
+      options: new Map([['package', 'com.app']]),
     })
+  })
+
+  it('keeps extra flags for upload and details', () => {
+    const invocation = parseInvocation(
+      ['upload', 'app.aab', '--track', 'internal', '--status', 'draft', '--package', 'com.app'],
+      environment,
+    )
+
+    expect(invocation.positional).toEqual(['app.aab'])
+    expect(invocation.options.get('track')).toBe('internal')
+    expect(invocation.options.get('status')).toBe('draft')
   })
 
   it('reads package and key from the environment and expands ~', () => {
@@ -62,5 +74,13 @@ describe('releaseToPromote', () => {
 
   it('fails when the versionCode is not on the source track', () => {
     expect(() => releaseToPromote({ track: 'alpha', releases: [] }, '18')).toThrow()
+  })
+})
+
+describe('contentTypeOf', () => {
+  it('sends JPEG screenshots as JPEG and bundles as binary', () => {
+    expect(contentTypeOf('store/1-map.jpg')).toBe('image/jpeg')
+    expect(contentTypeOf('feature.PNG')).toBe('image/png')
+    expect(contentTypeOf('app-release.aab')).toBe('application/octet-stream')
   })
 })

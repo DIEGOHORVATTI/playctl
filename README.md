@@ -17,6 +17,17 @@ playctl promote 18 --package com.example.app
 playctl promote 19 --from internal --to production --package com.example.app
 ```
 
+playctl upload app-release.aab --track internal --status draft --name 1.0.0 --notes play/whatsnew
+playctl details --email you@example.com --website https://example.com
+playctl datasafety data-safety.csv
+```
+
+`upload` sends an AAB and releases it on a track in a single edit; `--notes` reads `whatsnew-<language>` files. An app that was never published only accepts `--status draft`. `details` sets the contact info shown on the store page. `datasafety` writes the Data safety form from the CSV that Play Console exports.
+
+```sh
+playctl images store/listing.json
+```
+
 `promote` copies the release (name and release notes) from one track to another and publishes it complete. Every call opens a Play edit and either commits it (`promote`) or discards it (`status`), so a failed run never leaves a half-made change.
 
 ## Configuration

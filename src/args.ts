@@ -10,6 +10,9 @@ export const USAGE = [
   '  playctl promote <versionCode> [--from alpha] [--to production]',
   '  playctl images <listing.json>   replace store images of each language',
   '  playctl stats [installs|store_performance] [--bucket gs://pubsite_prod_...]',
+  '  playctl upload <app.aab> [--track internal] [--status draft] [--name 1.0.0] [--notes dir]',
+  '  playctl details [--email you@x.com] [--website https://...] [--language en-US]',
+  '  playctl datasafety <labels.csv>   write the Data safety form',
   '',
   'Options:',
   '  --package <name>   application id (or PLAY_PACKAGE_NAME, or .playctl.json)',
@@ -32,6 +35,7 @@ export type Invocation = {
   from: string
   to: string
   bucket: string
+  options: Map<string, string>
 }
 
 type Environment = {
@@ -79,6 +83,7 @@ export function parseInvocation(
     keyFile: expandHome(keyFile, home),
     from: flags.get('from') ?? 'alpha',
     to: flags.get('to') ?? 'production',
+    options: flags,
     bucket: (flags.get('bucket') ?? env.PLAY_REPORTS_BUCKET ?? config.reportsBucket ?? '').replace(
       /^gs:\/\/|\/.*$/g,
       '',

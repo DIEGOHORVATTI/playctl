@@ -44,6 +44,33 @@ export type ImageSet = {
   files: string[]
 }
 
+export type BundleRelease = {
+  file: string
+  track: string
+  status: string
+  name?: string
+  releaseNotes: { language: string; text: string }[]
+}
+
+export type AppDetails = {
+  contactEmail?: string
+  contactWebsite?: string
+  contactPhone?: string
+  defaultLanguage?: string
+}
+
+const CONTENT_TYPES: Record<string, string> = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.aab': 'application/octet-stream',
+}
+
+export function contentTypeOf(file: string) {
+  const extension = file.slice(file.lastIndexOf('.')).toLowerCase()
+  return CONTENT_TYPES[extension] ?? 'application/octet-stream'
+}
+
 export type ClientOptions = {
   packageName: string
   keyFile: string
@@ -114,13 +141,13 @@ export async function playClient({ packageName, keyFile }: ClientOptions) {
     return (text ? JSON.parse(text) : {}) as T
   }
 
-  const upload = async (path: string, file: string, attempt = 1): Promise<void> => {
+  const upload = async <T = unknown>(path: string, file: string, attempt = 1): Promise<T> => {
     const response = await fetch(`${UPLOAD_API}/${packageName}${path}?uploadType=media`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'image/png' },
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': contentTypeOf(file) },
       body: readFileSync(file),
     })
-    if (response.ok) return
+    if (response.ok) return (await response.json()) as T
 
     const text = await response.text()
     if (response.status < 500 || attempt >= UPLOAD_ATTEMPTS) {
@@ -129,7 +156,7 @@ export async function playClient({ packageName, keyFile }: ClientOptions) {
 
     process.stdout.write(`${response.status}, retrying (${attempt}/${UPLOAD_ATTEMPTS - 1})... `)
     await Bun.sleep(attempt * 3000)
-    return upload(path, file, attempt + 1)
+    return upload<T>(path, file, attempt + 1)
   }
 
   const withEdit = async <T>(work: (editId: string) => Promise<T>, commit: boolean) => {
@@ -168,6 +195,22 @@ export async function playClient({ packageName, keyFile }: ClientOptions) {
 
       return new TextDecoder('utf-16le').decode(await response.arrayBuffer()).replace(/^\uFEFF/, '')
     },
+    uploadBundle: ({ file, track, status, name, releaseNotes }: BundleRelease) =>
+      withEdit(async (id) => {
+        const size = (statSync(file).size / 1024 / 1024).toFixed(1)
+        process.stdout.write(`Uploading ${basename(file)} ${size} MB... `)
+        const { versionCode } = await upload<{ versionCode: number }>(`/edits/${id}/bundles`, file)
+        console.log(`versionCode ${versionCode}`)
+
+        const release: Release = { name, status, versionCodes: [String(versionCode)], releaseNotes }
+        await call(`/edits/${id}/tracks/${track}`, 'PUT', { track, releases: [release] })
+        console.log('Committing edit, Google may take a minute...')
+
+        return versionCode
+      }, true),
+    updateDetails: (details: AppDetails) =>
+      withEdit((id) => call<AppDetails>(`/edits/${id}/details`, 'PATCH', details), true),
+    writeDataSafety: (csv: string) => call('/dataSafety', 'POST', { safetyLabels: csv }),
     tracks: () =>
       withEdit((id) => call<{ tracks: Track[] }>(`/edits/${id}/tracks`), false).then(
         (result) => result.tracks,

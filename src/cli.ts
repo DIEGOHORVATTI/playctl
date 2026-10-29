@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { dirname, join } from 'node:path'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 
 import { type Listing, playClient } from './client'
 import { USAGE, parseInvocation } from './args'
@@ -43,11 +43,23 @@ function readManifest(file: string) {
   ])
 }
 
+const COMMANDS = ['status', 'promote', 'images', 'stats', 'upload', 'details', 'datasafety']
+const RELEASE_NOTES_FILE = /^whatsnew-(.+)$/
+
+function readReleaseNotes(dir: string | undefined) {
+  if (!dir) return []
+
+  return readdirSync(dir)
+    .map((file) => ({ file, language: RELEASE_NOTES_FILE.exec(file)?.[1] }))
+    .filter((entry): entry is { file: string; language: string } => !!entry.language)
+    .map(({ file, language }) => ({ language, text: readFileSync(join(dir, file), 'utf8').trim() }))
+}
+
 async function main(argv: string[]) {
   const invocation = parseInvocation(argv)
-  const { command, positional, packageName, keyFile, from, to, bucket } = invocation
+  const { command, positional, packageName, keyFile, from, to, bucket, options } = invocation
 
-  if (!['status', 'promote', 'images', 'stats'].includes(command ?? '')) {
+  if (!COMMANDS.includes(command ?? '')) {
     console.log(USAGE)
     return
   }
@@ -70,6 +82,42 @@ async function main(argv: string[]) {
       console.log(`\n== ${name}`)
       console.log(await play.readReport(bucket, name))
     }
+    return
+  }
+
+  if (command === 'upload') {
+    const [file] = positional
+    if (!file) throw new Error(USAGE)
+
+    const track = options.get('track') ?? 'internal'
+    const versionCode = await play.uploadBundle({
+      file,
+      track,
+      status: options.get('status') ?? 'completed',
+      name: options.get('name'),
+      releaseNotes: readReleaseNotes(options.get('notes')),
+    })
+    console.log(`versionCode ${versionCode} released to ${track}`)
+    return
+  }
+
+  if (command === 'details') {
+    const details = await play.updateDetails({
+      contactEmail: options.get('email'),
+      contactWebsite: options.get('website'),
+      contactPhone: options.get('phone'),
+      defaultLanguage: options.get('language'),
+    })
+    console.log(JSON.stringify(details, null, 2))
+    return
+  }
+
+  if (command === 'datasafety') {
+    const [file] = positional
+    if (!file) throw new Error(USAGE)
+
+    await play.writeDataSafety(readFileSync(file, 'utf8'))
+    console.log('Data safety form written')
     return
   }
 
