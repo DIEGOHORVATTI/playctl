@@ -28,6 +28,7 @@ They need the browser session (cookies + `X-Goog-AuthUser` + an API key), not th
 | Content rating 3/3 | `POST /developers/{dev}/apps/{app}/contentRating/{n}:applyRating` | `{"1":{<appRef>,"3":{"1":"{n}"}},"2":"2"}` | result for Fake Traveler: ClassInd L, ESRB E, PEGI 3, IARC 3+ |
 | Content rating (questions) | `GET /developers/apps/appContent/contentRating/iarcQuestionnaire/{locale}` | | question/answer ids and texts |
 | Data safety ("collects nothing") | `PATCH .../declarations/POLICY_DECLARATION_ID_PSL` | type `3`, answers `[{"1":5,"9":{"1":false}}]` | when data IS collected, use the public `POST applications/{package}/dataSafety` with the CSV instead (`playctl datasafety`) |
+| App category | `PATCH /developers/{dev}/apps/{app}/storesettings?updateMask.paths=app_category` | `{"1":<appRef>,"2":{...}}` | the body carries the whole category catalog with the selected id; capture it again before automating |
 
 ## Status
 
