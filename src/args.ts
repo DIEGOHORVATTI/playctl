@@ -13,6 +13,8 @@ export const USAGE = [
   '  playctl upload <app.aab> [--track internal] [--status draft] [--name 1.0.0] [--notes dir]',
   '  playctl details [--email you@x.com] [--website https://...] [--language en-US]',
   '  playctl datasafety <labels.csv>   write the Data safety form',
+  '  playctl login [--developer <id>]   sign in to Play Console (plain Chrome), then save the session',
+  '  playctl content <app-content.json> answer the App content forms (needs playctl login)',
   '',
   'Options:',
   '  --package <name>   application id (or PLAY_PACKAGE_NAME, or .playctl.json)',
@@ -22,6 +24,7 @@ export const USAGE = [
 ].join('\n')
 
 type ProjectConfig = {
+  consoleAppId?: string
   reportsBucket?: string
   packageName?: string
   keyFile?: string
@@ -36,6 +39,9 @@ export type Invocation = {
   to: string
   bucket: string
   options: Map<string, string>
+  consoleAppId: string
+  sessionFile: string
+  chrome: string
 }
 
 type Environment = {
@@ -68,7 +74,7 @@ export function parseInvocation(
   const config = readProjectConfig(cwd)
   const [command, ...rest] = positional
   const packageName = flags.get('package') ?? env.PLAY_PACKAGE_NAME ?? config.packageName
-  if (command && !packageName) throw new Error(`Missing --package.\n\n${USAGE}`)
+  if (command && command !== 'login' && !packageName) throw new Error(`Missing --package.\n\n${USAGE}`)
 
   const keyFile =
     flags.get('key') ??
@@ -84,6 +90,9 @@ export function parseInvocation(
     from: flags.get('from') ?? 'alpha',
     to: flags.get('to') ?? 'production',
     options: flags,
+    consoleAppId: flags.get('app-id') ?? env.PLAY_CONSOLE_APP_ID ?? config.consoleAppId ?? '',
+    sessionFile: join(home, '.config', 'playctl', 'console-session.json'),
+    chrome: env.PLAYCTL_CHROME ?? 'google-chrome',
     bucket: (flags.get('bucket') ?? env.PLAY_REPORTS_BUCKET ?? config.reportsBucket ?? '').replace(
       /^gs:\/\/|\/.*$/g,
       '',

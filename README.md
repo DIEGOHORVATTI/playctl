@@ -28,16 +28,43 @@ playctl images store/listing.json
 
 `promote` copies the release (name and release notes) from one track to another and publishes it complete. Every call opens a Play edit and either commits it (`promote`) or discards it (`status`), so a failed run never leaves a half-made change.
 
-## What the Play API cannot do
+## App content forms (Play Console session)
 
-Creating the app, privacy policy, ads, app access, content rating (IARC), target audience and the other
-App content declarations only exist in Play Console. [`docs/console-api.md`](docs/console-api.md) maps the
-Console's internal calls for each of them.
+Privacy policy, ads, app access, advertising ID, government, financial and health declarations, Data
+safety, target audience and the IARC content rating only exist in Play Console. `playctl` answers them
+through the Console's own internal API with your signed-in session:
+
+```sh
+playctl login --developer <developer account id>   # sign in once in a plain Chrome, then close it
+playctl content store/app-content.json --app-id <Play Console app id>
+```
+
+```json
+{
+  "privacyPolicyUrl": "https://example.com/privacy",
+  "containsAds": false,
+  "loginRequired": false,
+  "usesAdvertisingId": false,
+  "governmentApp": false,
+  "financialFeatures": false,
+  "healthFeatures": false,
+  "collectsData": false,
+  "targetAges": ["18+"],
+  "contentRating": { "email": "you@example.com", "category": "other", "ratedContent": false }
+}
+```
+
+`login` opens a dedicated Chrome profile (`~/.config/playctl/chrome-profile`) without automation so Google
+accepts the sign-in, then reopens it to read the session into `~/.config/playctl/console-session.json`
+(mode 600). Run it again when Play Console answers 401/403. Only the answers mapped in
+[`docs/console-api.md`](docs/console-api.md) are supported; anything else fails instead of guessing. This is an
+unofficial API and may change. Creating the app and the store category still happen in Play Console.
 
 ## Configuration
 
 | Setting | Flag | Environment | `.playctl.json` |
 | --- | --- | --- | --- |
+| Play Console app id | `--app-id` | `PLAY_CONSOLE_APP_ID` | `consoleAppId` |
 | Application id | `--package` | `PLAY_PACKAGE_NAME` | `packageName` |
 | Service account key | `--key` | `PLAY_KEY_FILE` | `keyFile` |
 

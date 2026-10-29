@@ -1,3 +1,5 @@
 node_modules
 *.json.key
 play-key.json
+console-session.json
+chrome-profile/

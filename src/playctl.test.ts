@@ -18,6 +18,9 @@ describe('parseInvocation', () => {
       to: 'production',
       bucket: '',
       options: new Map([['package', 'com.app']]),
+      consoleAppId: '',
+      sessionFile: '/home/me/.config/playctl/console-session.json',
+      chrome: 'google-chrome',
     })
   })
 

@@ -3,6 +3,9 @@ import { dirname, join } from 'node:path'
 import { readdirSync, readFileSync } from 'node:fs'
 
 import { type Listing, playClient } from './client'
+import { type AppContent, appContentCalls, findQuestionnaireId, iarcQuestionnaireBody, appRef } from './console-forms'
+import { CONSOLE_URL, captureConsoleSession, saveSession, signInWithPlainChrome } from './console-login'
+import { consoleClient, loadSession } from './console-session'
 import { USAGE, parseInvocation } from './args'
 
 type Manifest = {
@@ -43,7 +46,7 @@ function readManifest(file: string) {
   ])
 }
 
-const COMMANDS = ['status', 'promote', 'images', 'stats', 'upload', 'details', 'datasafety']
+const COMMANDS = ['status', 'promote', 'images', 'stats', 'upload', 'details', 'datasafety', 'login', 'content']
 const RELEASE_NOTES_FILE = /^whatsnew-(.+)$/
 
 function readReleaseNotes(dir: string | undefined) {
@@ -55,6 +58,46 @@ function readReleaseNotes(dir: string | undefined) {
     .map(({ file, language }) => ({ language, text: readFileSync(join(dir, file), 'utf8').trim() }))
 }
 
+async function answerAppContent(file: string, sessionFile: string, appId: string) {
+  const session = loadSession(sessionFile)
+  const call = consoleClient(session)
+  const ids = { developerId: session.developerId, appId }
+  const content = JSON.parse(readFileSync(file, 'utf8')) as AppContent
+
+  for (const form of appContentCalls(content, ids)) {
+    process.stdout.write(`${form.name}... `)
+    await call(form.path, { method: form.method, mask: form.mask, body: form.body })
+    console.log('saved')
+  }
+
+  if (!content.contentRating) return
+  const rating = content.contentRating
+  if (rating.category !== 'other' || rating.ratedContent) {
+    throw new Error('contentRating: only category "other" with ratedContent false is mapped yet')
+  }
+
+  const app = `/developers/${ids.developerId}/apps/${ids.appId}`
+  process.stdout.write('content rating... ')
+  await call(`${app}/contentRating:startFilledQuestionnaire`, { body: { '1': appRef(ids) } }).catch(
+    (error: Error) => {
+      if (!error.message.includes(' 409:')) throw error
+    },
+  )
+  const draft = await call(`${app}/contentRating/lastFilledIarcQuestionnaire`, { method: 'GET' })
+  const questionnaireId = findQuestionnaireId(draft)
+  if (!questionnaireId) throw new Error('Play Console did not return the content rating questionnaire')
+  const questionnaire = `${app}/contentRating/${questionnaireId}`
+  await call(`${questionnaire}/filledIarcQuestionnaire`, {
+    method: 'PATCH',
+    mask: ['answers', 'email_address', 'language_code'],
+    body: iarcQuestionnaireBody(ids, questionnaireId, rating.email),
+  })
+  const target = { '1': { ...appRef(ids), '3': { '1': questionnaireId } } }
+  await call(`${questionnaire}:calculate`, { body: target })
+  await call(`${questionnaire}:applyRating`, { body: { ...target, '2': '2' } })
+  console.log('applied')
+}
+
 async function main(argv: string[]) {
   const invocation = parseInvocation(argv)
   const { command, positional, packageName, keyFile, from, to, bucket, options } = invocation
@@ -64,7 +107,33 @@ async function main(argv: string[]) {
     return
   }
 
+  if (command === 'login') {
+    const profileDir = join(dirname(invocation.sessionFile), 'chrome-profile')
+    if (!options.has('skip-sign-in')) {
+      console.log('Sign in to Play Console in the Chrome window, then close that window.')
+      await signInWithPlainChrome(invocation.chrome, profileDir)
+    }
+
+    const developer = options.get('developer')
+    const startUrl = developer ? `${CONSOLE_URL}/u/0/developers/${developer}/app-list` : CONSOLE_URL
+    const session = await captureConsoleSession(invocation.chrome, profileDir, startUrl)
+    saveSession(invocation.sessionFile, session)
+    console.log(`Session saved for developer account ${session.developerId} (${invocation.sessionFile})`)
+    return
+  }
+
+  if (command === 'content') {
+    const [file] = positional
+    if (!file || !invocation.consoleAppId) {
+      throw new Error(`Usage: playctl content <app-content.json> --app-id <Play Console app id>\n\n${USAGE}`)
+    }
+
+    await answerAppContent(file, invocation.sessionFile, invocation.consoleAppId)
+    return
+  }
+
   const play = await playClient({ packageName, keyFile })
+
 
   if (command === 'stats') {
     if (!bucket) throw new Error(`Missing --bucket.\n\n${USAGE}`)
