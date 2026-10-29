@@ -47,12 +47,20 @@ describe('appContentCalls', () => {
 })
 
 describe('content rating', () => {
-  it('answers no to every question of the other apps category', () => {
-    const body = iarcQuestionnaireBody(ids, '1', 'me@example.com')
+  it('sends each saved answer as the Console does', () => {
+    const body = iarcQuestionnaireBody(ids, {
+      questionnaireId: '1',
+      version: '10.0',
+      email: 'me@example.com',
+      answers: { '1109': 2558, '1152': 2618 },
+    })
 
     expect(body['1']).toEqual({ ...ref, '3': { '1': '1' } })
-    expect(body['4']['1']).toHaveLength(10)
-    expect(body['4']['1'][0]).toEqual({ '1': 1109, '2': [2558] })
+    expect(body['2']).toBe('10.0')
+    expect(body['4']['1']).toEqual([
+      { '1': 1109, '2': [2558] },
+      { '1': 1152, '2': [2618] },
+    ])
   })
 
   it('finds the questionnaire id in lastFilledIarcQuestionnaire', () => {

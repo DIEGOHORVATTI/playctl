@@ -21,6 +21,7 @@ describe('parseInvocation', () => {
       consoleAppId: '',
       sessionFile: '/home/me/.config/playctl/console-session.json',
       chrome: 'google-chrome',
+      configFile: '/tmp/nowhere/.playctl.json',
     })
   })
 

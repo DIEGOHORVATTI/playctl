@@ -8,7 +8,32 @@ export type AppContent = {
   healthFeatures?: boolean
   collectsData?: boolean
   targetAges?: string[]
-  contentRating?: { email: string; category: 'other'; ratedContent: false }
+  contentRating?: { email: string; answers: Record<string, number> }
+}
+
+export type DeclarationKey =
+  | 'containsAds'
+  | 'loginRequired'
+  | 'usesAdvertisingId'
+  | 'governmentApp'
+  | 'financialFeatures'
+  | 'healthFeatures'
+  | 'collectsData'
+
+export const DECLARATION_QUESTIONS: { key: DeclarationKey; text: string }[] = [
+  { key: 'containsAds', text: 'O app mostra anúncios (inclusive de SDKs de terceiros)?' },
+  { key: 'loginRequired', text: 'Alguma parte do app exige login, assinatura ou código para acessar?' },
+  { key: 'usesAdvertisingId', text: 'O app (ou um SDK dele) usa o ID de publicidade?' },
+  { key: 'governmentApp', text: 'O app foi feito por ou em nome de um governo?' },
+  { key: 'financialFeatures', text: 'O app oferece funcionalidades financeiras (pagamentos, empréstimos, investimentos...)?' },
+  { key: 'healthFeatures', text: 'O app tem funcionalidades de saúde (fitness, medicina, bem-estar...)?' },
+  { key: 'collectsData', text: 'O app coleta ou compartilha dados do usuário fora do aparelho?' },
+]
+
+export const TARGET_AGE_OPTIONS = ['18+', '16-17', '13-15', '9-12', '6-8', '0-5']
+
+export function isMappedAge(age: string) {
+  return age in TARGET_AGE_BANDS
 }
 
 type AppIds = { developerId: string; appId: string }
@@ -35,21 +60,7 @@ const NONE_OF_THESE = {
   healthFeatures: { id: 'HEALTH', type: 26, question: 185, none: 330 },
 } as const
 
-export const IARC_ALL_NO_OTHER_APPS = [
-  [1109, 2558],
-  [1152, 2618],
-  [1188, 2628],
-  [1193, 2630],
-  [1037, 2370],
-  [1194, 2632],
-  [1195, 2334],
-  [1375, 2940],
-  [1196, 2223],
-  [1197, 2634],
-] as const
-
-export const IARC_QUESTIONNAIRE_VERSION = '10.0'
-const IARC_CATEGORY_OTHER_APPS = 1
+const IARC_QUESTIONNAIRE_TYPE = 1
 
 export function appRef({ developerId, appId }: AppIds) {
   return { '1': { '1': developerId }, '2': { '1': appId } }
@@ -142,13 +153,25 @@ export function appContentCalls(content: AppContent, ids: AppIds): FormCall[] {
   return calls
 }
 
-export function iarcQuestionnaireBody(ids: AppIds, questionnaireId: string, email: string) {
+type IarcSubmission = {
+  questionnaireId: string
+  version: string
+  email: string
+  answers: Record<string, number>
+}
+
+export function iarcQuestionnaireBody(ids: AppIds, submission: IarcSubmission) {
   return {
-    '1': { ...appRef(ids), '3': { '1': questionnaireId } },
-    '2': IARC_QUESTIONNAIRE_VERSION,
-    '3': email,
-    '4': { '1': IARC_ALL_NO_OTHER_APPS.map(([question, answer]) => ({ '1': question, '2': [answer] })) },
-    '5': IARC_CATEGORY_OTHER_APPS,
+    '1': { ...appRef(ids), '3': { '1': submission.questionnaireId } },
+    '2': submission.version,
+    '3': submission.email,
+    '4': {
+      '1': Object.entries(submission.answers).map(([question, answer]) => ({
+        '1': Number(question),
+        '2': [answer],
+      })),
+    },
+    '5': IARC_QUESTIONNAIRE_TYPE,
     '7': 'en-US',
   }
 }

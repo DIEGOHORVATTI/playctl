@@ -14,7 +14,8 @@ export const USAGE = [
   '  playctl details [--email you@x.com] [--website https://...] [--language en-US]',
   '  playctl datasafety <labels.csv>   write the Data safety form',
   '  playctl login [--developer <id>]   sign in to Play Console (plain Chrome), then save the session',
-  '  playctl content <app-content.json> answer the App content forms (needs playctl login)',
+  '  playctl init [--ai claude|codex] [--yes]   answer the App content questions into .playctl.json',
+  '  playctl content [answers.json]     send the App content answers to Play Console (needs login)',
   '',
   'Options:',
   '  --package <name>   application id (or PLAY_PACKAGE_NAME, or .playctl.json)',
@@ -42,6 +43,7 @@ export type Invocation = {
   consoleAppId: string
   sessionFile: string
   chrome: string
+  configFile: string
 }
 
 type Environment = {
@@ -58,6 +60,8 @@ function readProjectConfig(cwd: string): ProjectConfig {
   return existsSync(file) ? (JSON.parse(readFileSync(file, 'utf8')) as ProjectConfig) : {}
 }
 
+const BOOLEAN_FLAGS = new Set(['--yes', '--skip-sign-in'])
+
 export function parseInvocation(
   argv: string[],
   { cwd, env, home }: Environment = { cwd: process.cwd(), env: process.env, home: homedir() },
@@ -67,7 +71,8 @@ export function parseInvocation(
 
   for (let index = 0; index < argv.length; index++) {
     const arg = argv[index]!
-    if (arg.startsWith('--') && argv[index + 1]) flags.set(arg.slice(2), argv[++index]!)
+    if (BOOLEAN_FLAGS.has(arg)) flags.set(arg.slice(2), 'true')
+    else if (arg.startsWith('--') && argv[index + 1]) flags.set(arg.slice(2), argv[++index]!)
     else positional.push(arg)
   }
 
@@ -92,6 +97,7 @@ export function parseInvocation(
     options: flags,
     consoleAppId: flags.get('app-id') ?? env.PLAY_CONSOLE_APP_ID ?? config.consoleAppId ?? '',
     sessionFile: join(home, '.config', 'playctl', 'console-session.json'),
+    configFile: join(cwd, '.playctl.json'),
     chrome: env.PLAYCTL_CHROME ?? 'google-chrome',
     bucket: (flags.get('bucket') ?? env.PLAY_REPORTS_BUCKET ?? config.reportsBucket ?? '').replace(
       /^gs:\/\/|\/.*$/g,

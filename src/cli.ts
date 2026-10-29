@@ -1,11 +1,13 @@
 #!/usr/bin/env bun
 import { dirname, join } from 'node:path'
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 
 import { type Listing, playClient } from './client'
 import { type AppContent, appContentCalls, findQuestionnaireId, iarcQuestionnaireBody, appRef } from './console-forms'
 import { CONSOLE_URL, captureConsoleSession, saveSession, signInWithPlainChrome } from './console-login'
 import { consoleClient, loadSession } from './console-session'
+import type { IarcCatalog } from './console-catalog'
+import { initAppContent } from './console-init'
 import { USAGE, parseInvocation } from './args'
 
 type Manifest = {
@@ -46,7 +48,7 @@ function readManifest(file: string) {
   ])
 }
 
-const COMMANDS = ['status', 'promote', 'images', 'stats', 'upload', 'details', 'datasafety', 'login', 'content']
+const COMMANDS = ['status', 'promote', 'images', 'stats', 'upload', 'details', 'datasafety', 'login', 'init', 'content']
 const RELEASE_NOTES_FILE = /^whatsnew-(.+)$/
 
 function readReleaseNotes(dir: string | undefined) {
@@ -58,11 +60,37 @@ function readReleaseNotes(dir: string | undefined) {
     .map(({ file, language }) => ({ language, text: readFileSync(join(dir, file), 'utf8').trim() }))
 }
 
-async function answerAppContent(file: string, sessionFile: string, appId: string) {
+const IARC_CATALOG = '/developers/apps/appContent/contentRating/iarcQuestionnaire/pt-BR'
+
+type ProjectFile = Record<string, unknown> & { appContent?: AppContent }
+
+function readProjectFile(configFile: string): ProjectFile {
+  return existsSync(configFile) ? (JSON.parse(readFileSync(configFile, 'utf8')) as ProjectFile) : {}
+}
+
+async function runInit(invocation: ReturnType<typeof parseInvocation>) {
+  const call = consoleClient(loadSession(invocation.sessionFile))
+  const catalog = await call<IarcCatalog>(IARC_CATALOG, { method: 'GET' })
+  const project = readProjectFile(invocation.configFile)
+
+  const appContent = await initAppContent({
+    packageName: invocation.packageName,
+    catalog,
+    previous: project.appContent,
+    ai: invocation.options.get('ai'),
+    acceptAll: invocation.options.has('yes'),
+    cwd: dirname(invocation.configFile),
+  })
+
+  writeFileSync(invocation.configFile, `${JSON.stringify({ ...project, appContent }, null, 2)}\n`)
+  console.log(`Answers saved in ${invocation.configFile} (appContent). Send them with: playctl content`)
+  return appContent
+}
+
+async function answerAppContent(content: AppContent, sessionFile: string, appId: string) {
   const session = loadSession(sessionFile)
   const call = consoleClient(session)
   const ids = { developerId: session.developerId, appId }
-  const content = JSON.parse(readFileSync(file, 'utf8')) as AppContent
 
   for (const form of appContentCalls(content, ids)) {
     process.stdout.write(`${form.name}... `)
@@ -72,9 +100,7 @@ async function answerAppContent(file: string, sessionFile: string, appId: string
 
   if (!content.contentRating) return
   const rating = content.contentRating
-  if (rating.category !== 'other' || rating.ratedContent) {
-    throw new Error('contentRating: only category "other" with ratedContent false is mapped yet')
-  }
+  const catalog = await call<IarcCatalog>(IARC_CATALOG, { method: 'GET' })
 
   const app = `/developers/${ids.developerId}/apps/${ids.appId}`
   process.stdout.write('content rating... ')
@@ -90,7 +116,12 @@ async function answerAppContent(file: string, sessionFile: string, appId: string
   await call(`${questionnaire}/filledIarcQuestionnaire`, {
     method: 'PATCH',
     mask: ['answers', 'email_address', 'language_code'],
-    body: iarcQuestionnaireBody(ids, questionnaireId, rating.email),
+    body: iarcQuestionnaireBody(ids, {
+      questionnaireId,
+      version: catalog['4'],
+      email: rating.email,
+      answers: rating.answers,
+    }),
   })
   const target = { '1': { ...appRef(ids), '3': { '1': questionnaireId } } }
   await call(`${questionnaire}:calculate`, { body: target })
@@ -122,13 +153,21 @@ async function main(argv: string[]) {
     return
   }
 
-  if (command === 'content') {
-    const [file] = positional
-    if (!file || !invocation.consoleAppId) {
-      throw new Error(`Usage: playctl content <app-content.json> --app-id <Play Console app id>\n\n${USAGE}`)
-    }
+  if (command === 'init') {
+    await runInit(invocation)
+    return
+  }
 
-    await answerAppContent(file, invocation.sessionFile, invocation.consoleAppId)
+  if (command === 'content') {
+    if (!invocation.consoleAppId) throw new Error(`Missing --app-id (Play Console app id).\n\n${USAGE}`)
+
+    const [file] = positional
+    const saved = file
+      ? (JSON.parse(readFileSync(file, 'utf8')) as AppContent)
+      : readProjectFile(invocation.configFile).appContent
+    const content = saved ?? (await runInit(invocation))
+
+    await answerAppContent(content, invocation.sessionFile, invocation.consoleAppId)
     return
   }
 

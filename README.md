@@ -36,23 +36,16 @@ through the Console's own internal API with your signed-in session:
 
 ```sh
 playctl login --developer <developer account id>   # sign in once in a plain Chrome, then close it
-playctl content store/app-content.json --app-id <Play Console app id>
+playctl init --ai claude                           # answer the questions (the AI pre-fills them from the code)
+playctl content                                    # send the answers to Play Console
 ```
 
-```json
-{
-  "privacyPolicyUrl": "https://example.com/privacy",
-  "containsAds": false,
-  "loginRequired": false,
-  "usesAdvertisingId": false,
-  "governmentApp": false,
-  "financialFeatures": false,
-  "healthFeatures": false,
-  "collectsData": false,
-  "targetAges": ["18+"],
-  "contentRating": { "email": "you@example.com", "category": "other", "ratedContent": false }
-}
-```
+`init` asks every question in the terminal (arrow keys + Enter) and saves the answers in `.playctl.json` under
+`appContent`, so the project keeps them. The content rating questions come live from Play Console, following
+the same branching as the web form. With `--ai claude` or `--ai codex` the AI reads the project (manifest,
+permissions, SDKs, login, network calls) and pre-selects each answer with a one-line reason; you still confirm
+every answer. `--yes` accepts the suggestions without asking and fails if any question was left without one.
+`playctl content` without a saved `appContent` runs `init` first.
 
 `login` opens a dedicated Chrome profile (`~/.config/playctl/chrome-profile`) without automation so Google
 accepts the sign-in, then reopens it to read the session into `~/.config/playctl/console-session.json`
