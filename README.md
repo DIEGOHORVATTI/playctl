@@ -28,6 +28,12 @@ playctl images store/listing.json
 
 `promote` copies the release (name and release notes) from one track to another and publishes it complete. Every call opens a Play edit and either commits it (`promote`) or discards it (`status`), so a failed run never leaves a half-made change.
 
+## What the Play API cannot do
+
+Creating the app, privacy policy, ads, app access, content rating (IARC), target audience and the other
+App content declarations only exist in Play Console. [`docs/console-api.md`](docs/console-api.md) maps the
+Console's internal calls for each of them.
+
 ## Configuration
 
 | Setting | Flag | Environment | `.playctl.json` |
