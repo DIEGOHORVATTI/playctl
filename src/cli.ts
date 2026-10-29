@@ -254,7 +254,7 @@ async function main(argv: string[]) {
   const [versionCode] = positional
   if (!versionCode || !/^\d+$/.test(versionCode)) throw new Error(USAGE)
 
-  const release = await play.promote(versionCode, from, to)
+  const release = await play.promote(versionCode, from, to, options.get('status'))
   console.log(`versionCode ${versionCode} (${release.name ?? ''}) moved from ${from} to ${to}`)
 }
 

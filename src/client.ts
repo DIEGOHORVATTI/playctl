@@ -112,13 +112,13 @@ async function accessToken(key: ServiceAccount): Promise<string> {
   return ((await response.json()) as { access_token: string }).access_token
 }
 
-export function releaseToPromote(source: Track, versionCode: string): Release {
+export function releaseToPromote(source: Track, versionCode: string, status = 'completed'): Release {
   const found = source.releases?.find((release) => release.versionCodes?.includes(versionCode))
   if (!found) throw new Error(`versionCode ${versionCode} is not on track ${source.track}`)
 
   return {
     name: found.name,
-    status: 'completed',
+    status,
     versionCodes: [versionCode],
     releaseNotes: found.releaseNotes ?? [],
   }
@@ -215,10 +215,10 @@ export async function playClient({ packageName, keyFile }: ClientOptions) {
       withEdit((id) => call<{ tracks: Track[] }>(`/edits/${id}/tracks`), false).then(
         (result) => result.tracks,
       ),
-    promote: (versionCode: string, from: string, to: string) =>
+    promote: (versionCode: string, from: string, to: string, status?: string) =>
       withEdit(async (id) => {
         const source = await call<Track>(`/edits/${id}/tracks/${from}`)
-        const release = releaseToPromote(source, versionCode)
+        const release = releaseToPromote(source, versionCode, status)
 
         await call(`/edits/${id}/tracks/${to}`, 'PUT', { track: to, releases: [release] })
 

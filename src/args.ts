@@ -7,7 +7,7 @@ export const USAGE = [
   '',
   'Usage:',
   '  playctl status',
-  '  playctl promote <versionCode> [--from alpha] [--to production]',
+  '  playctl promote <versionCode> [--from alpha] [--to production] [--status draft]',
   '  playctl images <listing.json>   replace store images of each language',
   '  playctl stats [installs|store_performance] [--bucket gs://pubsite_prod_...]',
   '  playctl upload <app.aab> [--track internal] [--status draft] [--name 1.0.0] [--notes dir]',
