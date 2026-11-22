@@ -16,6 +16,7 @@ export const USAGE = [
   '  playctl login [--developer <id>]   sign in to Play Console (plain Chrome), then save the session',
   '  playctl init [--ai claude|codex] [--yes]   answer the App content questions into .playctl.json',
   '  playctl content [answers.json]     send the App content answers to Play Console (needs login)',
+  '  playctl capture [--out calls.jsonl]   record the Play Console API calls you make in Chrome',
   '',
   'Options:',
   '  --package <name>   application id (or PLAY_PACKAGE_NAME, or .playctl.json)',
@@ -79,7 +80,7 @@ export function parseInvocation(
   const config = readProjectConfig(cwd)
   const [command, ...rest] = positional
   const packageName = flags.get('package') ?? env.PLAY_PACKAGE_NAME ?? config.packageName
-  if (command && command !== 'login' && !packageName) throw new Error(`Missing --package.\n\n${USAGE}`)
+  if (command && !['login', 'capture'].includes(command) && !packageName) throw new Error(`Missing --package.\n\n${USAGE}`)
 
   const keyFile =
     flags.get('key') ??

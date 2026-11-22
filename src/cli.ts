@@ -6,6 +6,7 @@ import { type Listing, playClient } from './client'
 import { type AppContent, appContentCalls, findQuestionnaireId, iarcQuestionnaireBody, appRef } from './console-forms'
 import { CONSOLE_URL, captureConsoleSession, saveSession, signInWithPlainChrome } from './console-login'
 import { consoleClient, loadSession } from './console-session'
+import { captureConsoleCalls } from './console-capture'
 import type { IarcCatalog } from './console-catalog'
 import { initAppContent } from './console-init'
 import { USAGE, parseInvocation } from './args'
@@ -48,7 +49,7 @@ function readManifest(file: string) {
   ])
 }
 
-const COMMANDS = ['status', 'promote', 'images', 'stats', 'upload', 'details', 'datasafety', 'login', 'init', 'content']
+const COMMANDS = ['status', 'promote', 'images', 'stats', 'upload', 'details', 'datasafety', 'login', 'init', 'content', 'capture']
 const RELEASE_NOTES_FILE = /^whatsnew-(.+)$/
 
 function readReleaseNotes(dir: string | undefined) {
@@ -150,6 +151,16 @@ async function main(argv: string[]) {
     const session = await captureConsoleSession(invocation.chrome, profileDir, startUrl)
     saveSession(invocation.sessionFile, session)
     console.log(`Session saved for developer account ${session.developerId} (${invocation.sessionFile})`)
+    return
+  }
+
+  if (command === 'capture') {
+    const profileDir = join(dirname(invocation.sessionFile), 'chrome-profile')
+    const outFile = options.get('out') ?? 'playctl-capture.jsonl'
+    console.log(`Recording Play Console API calls to ${outFile}. Use Play Console, then close the window.`)
+    await captureConsoleCalls(invocation.chrome, profileDir, CONSOLE_URL, outFile, (session) =>
+      saveSession(invocation.sessionFile, session),
+    )
     return
   }
 

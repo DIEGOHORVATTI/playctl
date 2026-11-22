@@ -65,7 +65,17 @@ export function signInWithPlainChrome(chrome: string, profileDir: string) {
   return new Promise<void>((resolve) => browser.on('exit', () => resolve()))
 }
 
-export async function captureConsoleSession(chrome: string, profileDir: string, startUrl: string) {
+export type DevtoolsEvent = {
+  method?: string
+  params?: Record<string, unknown> & {
+    requestId?: string
+    request?: { url: string; method?: string; postData?: string; hasPostData?: boolean }
+    response?: { status: number }
+    frame?: { url: string; parentId?: string }
+  }
+}
+
+export async function launchWithDevtools(chrome: string, profileDir: string, startUrl: string) {
   mkdirSync(profileDir, { recursive: true })
   rmSync(`${profileDir}/DevToolsActivePort`, { force: true })
   const browser = spawn(
@@ -79,53 +89,76 @@ export async function captureConsoleSession(chrome: string, profileDir: string, 
 
   let nextId = 0
   const pending = new Map<number, (message: CdpMessage) => void>()
-  const send = (method: string, params: object = {}) =>
-    new Promise<CdpMessage>((resolve) => {
+  const listeners: ((event: DevtoolsEvent) => void)[] = []
+
+  socket.addEventListener('message', (event) => {
+    const message = JSON.parse(String(event.data)) as CdpMessage
+    if (message.id) return pending.get(message.id)?.(message)
+    for (const listener of listeners) listener(message as DevtoolsEvent)
+  })
+
+  const send = <T = CdpMessage>(method: string, params: object = {}) =>
+    new Promise<T>((resolve) => {
       const id = ++nextId
-      pending.set(id, resolve)
+      pending.set(id, resolve as (message: CdpMessage) => void)
       socket.send(JSON.stringify({ id, method, params }))
     })
+
+  const closed = new Promise<void>((resolve) => socket.addEventListener('close', () => resolve()))
+
+  async function close() {
+    await send('Browser.close').catch(() => null)
+    socket.close()
+    browser.kill()
+  }
+
+  return { send, closed, close, onEvent: (listener: (event: DevtoolsEvent) => void) => listeners.push(listener) }
+}
+
+export async function readSessionCookies(send: (method: string, params?: object) => Promise<CdpMessage>) {
+  const { result } = await send('Network.getCookies', { urls: COOKIE_URLS })
+  return (result?.cookies ?? []).map(({ name, value, domain }) => ({ name, value, domain }))
+}
+
+export function consoleApiRequest(url: string) {
+  const developerId = CONSOLE_API.exec(url)?.[1]
+  return developerId ? { developerId, headers: readCapturedHeaders(url) } : undefined
+}
+
+export async function captureConsoleSession(chrome: string, profileDir: string, startUrl: string) {
+  const devtools = await launchWithDevtools(chrome, profileDir, startUrl)
 
   const captured = new Promise<{ developerId: string; headers: Record<string, string> }>(
     (resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('Login timed out')), LOGIN_TIMEOUT_MS)
-      socket.addEventListener('message', (event) => {
-        const message = JSON.parse(String(event.data)) as CdpMessage
-        if (message.id) return pending.get(message.id)?.(message)
-
+      devtools.onEvent((message) => {
         const frame = message.params?.frame
         if (message.method === 'Page.frameNavigated' && frame && !frame.parentId) {
           console.log(`  at ${new URL(frame.url).host}${new URL(frame.url).pathname.slice(0, 40)}`)
         }
 
-        const url = message.params?.request?.url ?? ''
-        const developerId = CONSOLE_API.exec(url)?.[1]
-        const headers = developerId ? readCapturedHeaders(url) : {}
-        if (developerId && Object.keys(headers).length) {
+        const request = consoleApiRequest(message.params?.request?.url ?? '')
+        if (request && Object.keys(request.headers).length) {
           clearTimeout(timer)
-          resolve({ developerId, headers })
+          resolve(request)
         }
       })
     },
   )
 
-  await send('Network.enable')
-  await send('Page.enable')
+  await devtools.send('Network.enable')
+  await devtools.send('Page.enable')
   console.log('Reading the session (pick your developer account if Play Console asks)...')
   const { developerId, headers } = await captured
 
-  const { result } = await send('Network.getCookies', { urls: COOKIE_URLS })
   const session: ConsoleSession = {
     capturedAt: new Date().toISOString(),
     developerId,
     headers,
-    cookies: (result?.cookies ?? []).map(({ name, value, domain }) => ({ name, value, domain })),
+    cookies: await readSessionCookies(devtools.send),
   }
 
-  await send('Browser.close').catch(() => null)
-  socket.close()
-  browser.kill()
-
+  await devtools.close()
   return session
 }
 
