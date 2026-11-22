@@ -47,7 +47,8 @@ export type FormCall = {
 }
 
 const NO_ADS = 1
-const TARGET_AGE_BANDS: Record<string, number> = { '18+': 6 }
+const TARGET_AGE_BANDS: Record<string, number> = { '13-15': 4, '16-17': 5, '18+': 6 }
+const ADULT_BAND = 6
 
 const POLICY_DECLARATIONS = {
   usesAdvertisingId: { id: 'ADVERTISING_ID', type: 6, question: 66 },
@@ -146,7 +147,7 @@ export function appContentCalls(content: AppContent, ids: AppIds): FormCall[] {
         'supported_audience',
         'target_age_bands',
       ],
-      body: { '1': bands, '11': true, '12': 0 },
+      body: { '1': bands, ...(bands.some((band) => band < ADULT_BAND) ? { '2': {} } : {}), '11': true, '12': 0 },
     })
   }
 

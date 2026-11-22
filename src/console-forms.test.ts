@@ -40,9 +40,14 @@ describe('appContentCalls', () => {
     expect(byName['target audience']?.body).toEqual({ '1': [6], '11': true, '12': 0 })
   })
 
+  it('sends the teen bands with the empty minors field, as captured', () => {
+    const [call] = appContentCalls({ targetAges: ['13-15', '16-17', '18+'] }, ids)
+    expect(call?.body).toEqual({ '1': [4, 5, 6], '2': {}, '11': true, '12': 0 })
+  })
+
   it('refuses answers that were never captured instead of guessing', () => {
     expect(() => appContentCalls({ containsAds: true }, ids)).toThrow('not mapped yet')
-    expect(() => appContentCalls({ targetAges: ['13-15'] }, ids)).toThrow('not mapped yet')
+    expect(() => appContentCalls({ targetAges: ['9-12'] }, ids)).toThrow('not mapped yet')
   })
 })
 
