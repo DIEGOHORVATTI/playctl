@@ -7,6 +7,7 @@ import { type AppContent, appContentCalls, findQuestionnaireId, iarcQuestionnair
 import { CONSOLE_URL, captureConsoleSession, saveSession, signInWithPlainChrome } from './console-login'
 import { consoleClient, loadSession } from './console-session'
 import { captureConsoleCalls } from './console-capture'
+import { categoryBody, createAppBody, createdAppId, isPackageAvailable, resolveCategory } from './console-apps'
 import type { IarcCatalog } from './console-catalog'
 import { initAppContent } from './console-init'
 import { USAGE, parseInvocation } from './args'
@@ -49,7 +50,7 @@ function readManifest(file: string) {
   ])
 }
 
-const COMMANDS = ['status', 'promote', 'images', 'stats', 'upload', 'details', 'datasafety', 'login', 'init', 'content', 'capture']
+const COMMANDS = ['status', 'promote', 'images', 'stats', 'upload', 'details', 'datasafety', 'login', 'init', 'content', 'capture', 'create', 'category']
 const RELEASE_NOTES_FILE = /^whatsnew-(.+)$/
 
 function readReleaseNotes(dir: string | undefined) {
@@ -151,6 +152,47 @@ async function main(argv: string[]) {
     const session = await captureConsoleSession(invocation.chrome, profileDir, startUrl)
     saveSession(invocation.sessionFile, session)
     console.log(`Session saved for developer account ${session.developerId} (${invocation.sessionFile})`)
+    return
+  }
+
+  if (command === 'create') {
+    const session = loadSession(invocation.sessionFile)
+    const call = consoleClient(session)
+    const developer = `/developers/${session.developerId}`
+    const availability = await call(`${developer}:checkPackageNameAvailability`, {
+      method: 'GET',
+      query: { packageName },
+    })
+    if (!isPackageAvailable(availability)) throw new Error(`${packageName} is not available in Play Console`)
+
+    const created = await call(`${developer}:createAppV2`, {
+      body: createAppBody({
+        developerId: session.developerId,
+        name: options.get('name') ?? '',
+        language: options.get('language') ?? 'en-US',
+        packageName,
+      }),
+    })
+    const appId = createdAppId(created)
+    const project = readProjectFile(invocation.configFile)
+    writeFileSync(invocation.configFile, `${JSON.stringify({ ...project, packageName, consoleAppId: appId }, null, 2)}\n`)
+    console.log(`Created ${packageName} (Play Console app ${appId}), saved in ${invocation.configFile}`)
+    return
+  }
+
+  if (command === 'category') {
+    if (!invocation.consoleAppId) throw new Error(`Missing --app-id (Play Console app id).\n\n${USAGE}`)
+    const [value] = positional
+    if (!value) throw new Error(USAGE)
+
+    const session = loadSession(invocation.sessionFile)
+    const ids = { developerId: session.developerId, appId: invocation.consoleAppId }
+    await consoleClient(session)(`/developers/${ids.developerId}/apps/${ids.appId}/storesettings`, {
+      method: 'PATCH',
+      mask: ['app_category'],
+      body: categoryBody(ids, resolveCategory(value)),
+    })
+    console.log(`Category set to ${value}`)
     return
   }
 

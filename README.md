@@ -51,7 +51,13 @@ every answer. `--yes` accepts the suggestions without asking and fails if any qu
 accepts the sign-in, then reopens it to read the session into `~/.config/playctl/console-session.json`
 (mode 600). Run it again when Play Console answers 401/403. Only the answers mapped in
 [`docs/console-api.md`](docs/console-api.md) are supported; anything else fails instead of guessing. This is an
-unofficial API and may change. Creating the app and the store category still happen in Play Console.
+unofficial API and may change.
+
+```sh
+playctl create --name "My App" --language pt-BR   # creates the app and saves consoleAppId in .playctl.json
+playctl category books-and-reference             # store category (or a numeric id)
+playctl capture --out calls.jsonl                # record the Console calls you make, to map new forms
+```
 
 ## Configuration
 

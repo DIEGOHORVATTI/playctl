@@ -16,6 +16,8 @@ export const USAGE = [
   '  playctl login [--developer <id>]   sign in to Play Console (plain Chrome), then save the session',
   '  playctl init [--ai claude|codex] [--yes]   answer the App content questions into .playctl.json',
   '  playctl content [answers.json]     send the App content answers to Play Console (needs login)',
+  '  playctl create --name <name> [--language pt-BR]   create the app in Play Console (needs login)',
+  '  playctl category <books-and-reference|id>   set the store category (needs login)',
   '  playctl capture [--out calls.jsonl]   record the Play Console API calls you make in Chrome',
   '',
   'Options:',

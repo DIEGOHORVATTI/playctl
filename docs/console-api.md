@@ -28,9 +28,19 @@ They need the browser session (cookies + `X-Goog-AuthUser` + an API key), not th
 | Content rating 3/3 | `POST /developers/{dev}/apps/{app}/contentRating/{n}:applyRating` | `{"1":{<appRef>,"3":{"1":"{n}"}},"2":"2"}` | result for Fake Traveler: ClassInd L, ESRB E, PEGI 3, IARC 3+ |
 | Content rating (questions) | `GET /developers/apps/appContent/contentRating/iarcQuestionnaire/{locale}` | | question/answer ids and texts |
 | Data safety ("collects nothing") | `PATCH .../declarations/POLICY_DECLARATION_ID_PSL` | type `3`, answers `[{"1":5,"9":{"1":false}}]` | when data IS collected, use the public `POST applications/{package}/dataSafety` with the CSV instead (`playctl datasafety`) |
-| App category | `PATCH /developers/{dev}/apps/{app}/storesettings?updateMask.paths=app_category` | `{"1":<appRef>,"2":{...}}` | the body carries the whole category catalog with the selected id; capture it again before automating |
+| App category | `PATCH /developers/{dev}/apps/{app}/storesettings?updateMask.paths=app_category` | `{"1":<appRef>,"3":{"1":30}}` | `3.1` = category (`30` = Books & reference). The Console also resends the tag catalog (`2`), contact details (`4`) and external marketing (`5`); the minimal body works (`playctl category`) |
+| Package availability | `GET /developers/{dev}:checkPackageNameAvailability?packageName=<pkg>` | | `{"1":1}` = available |
+| Create app | `POST /developers/{dev}:createAppV2` | `{"1":{"1":"{dev}"},"2":"<name>","3":"pt-BR","4":1,"5":false,"6":true,"7":true,"9":{"1":true},"11":"<pkg>"}` | `4` = app (1), `5` = paid, `6` = Developer Program Policies, `7` = US export laws, `9.1` = automatic protection. Answers `{"1":{"1":{dev},"2":{"1":"<app id>"}}}` (`playctl create`) |
+
+## Capturing new calls
+
+`playctl capture --out calls.jsonl` opens the playctl Chrome profile with DevTools attached and writes every
+`playconsole*-pa` call (method, path, update mask, request and response bodies) to a JSONL file while you use
+Play Console. Close the window to stop. It also refreshes the saved session.
 
 ## Status
+
+Create app, category and capture added while setting up `com.diegohorvatti.scrollino` on 2026-11-21.
 
 Mapped while setting up `com.diegohorvatti.fakeTraveler` on 2026-10-29. Every row above returned 200 from the Console.
 These endpoints authenticate with the signed-in browser session, not with a service account, so `playctl` does

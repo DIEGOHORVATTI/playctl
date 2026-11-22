@@ -19,6 +19,7 @@ export type ConsoleSession = {
 type CallOptions = {
   method?: 'GET' | 'POST' | 'PATCH'
   mask?: string[]
+  query?: Record<string, string>
   body?: unknown
 }
 
@@ -41,8 +42,13 @@ export function sapisidAuthorization(cookies: ConsoleSession['cookies'], now: nu
   }).join(' ')
 }
 
-export function consoleUrl(path: string, method: string, mask: string[] = []) {
-  const params = new URLSearchParams()
+export function consoleUrl(
+  path: string,
+  method: string,
+  mask: string[] = [],
+  extra: Record<string, string> = {},
+) {
+  const params = new URLSearchParams(extra)
   if (method === 'PATCH') params.set('$httpMethod', 'PATCH')
   for (const field of mask) params.append('updateMask.paths', field)
   const query = params.toString()
@@ -53,8 +59,8 @@ export function consoleUrl(path: string, method: string, mask: string[] = []) {
 export function consoleClient(session: ConsoleSession) {
   const cookieHeader = session.cookies.map(({ name, value }) => `${name}=${value}`).join('; ')
 
-  return async function call<T>(path: string, { method = 'POST', mask, body }: CallOptions = {}) {
-    const response = await fetch(consoleUrl(path, method, mask), {
+  return async function call<T>(path: string, { method = 'POST', mask, query, body }: CallOptions = {}) {
+    const response = await fetch(consoleUrl(path, method, mask, query), {
       method: method === 'GET' ? 'GET' : 'POST',
       headers: {
         ...session.headers,
